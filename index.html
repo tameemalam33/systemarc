@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Website Testing Platform — Architecture</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #060818;
+    --surface: #0d1230;
+    --surface2: #111840;
+    --border: rgba(99,120,255,0.18);
+    --border2: rgba(99,120,255,0.32);
+
+    --blue-50: #e6f1fb; --blue-100: #b5d4f4; --blue-200: #85b7eb; --blue-400: #378add; --blue-600: #185fa5; --blue-800: #0c447c;
+    --teal-50: #e1f5ee; --teal-100: #9fe1cb; --teal-400: #1d9e75; --teal-600: #0f6e56; --teal-800: #085041;
+    --coral-50: #faece7; --coral-100: #f5c4b3; --coral-400: #d85a30; --coral-600: #993c1d; --coral-800: #712b13;
+    --amber-50: #faeeda; --amber-100: #fac775; --amber-400: #ba7517; --amber-600: #854f0b; --amber-800: #633806;
+    --purple-50: #eeedfe; --purple-100: #cecbf6; --purple-400: #7f77dd; --purple-600: #534ab7; --purple-800: #3c3489;
+    --green-50: #eaf3de; --green-100: #c0dd97; --green-400: #639922; --green-600: #3b6d11; --green-800: #27500a;
+    --pink-50: #fbeaf0; --pink-100: #f4c0d1; --pink-400: #d4537e; --pink-600: #993556; --pink-800: #72243e;
+    --gray-50: #f1efe8; --gray-100: #d3d1c7; --gray-400: #888780; --gray-600: #5f5e5a; --gray-800: #444441;
+
+    --text-primary: #e8eaf6;
+    --text-secondary: #8892b0;
+    --text-muted: #4a5580;
+    --accent: #6378ff;
+    --accent2: #a78bfa;
+    --glow: rgba(99,120,255,0.15);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Space Grotesk', sans-serif;
+    background: var(--bg);
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Animated grid background */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(99,120,255,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(99,120,255,0.04) 1px, transparent 1px);
+    background-size: 48px 48px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Radial glow blobs */
+  .blob {
+    position: fixed;
+    border-radius: 50%;
+    filter: blur(100px);
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.18;
+  }
+  .blob-1 { width: 500px; height: 500px; background: #534ab7; top: -100px; left: -100px; }
+  .blob-2 { width: 400px; height: 400px; background: #185fa5; bottom: 100px; right: -100px; }
+  .blob-3 { width: 300px; height: 300px; background: #0f6e56; top: 40%; left: 50%; transform: translateX(-50%); }
+
+  .wrapper {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 48px 24px 80px;
+  }
+
+  /* Header */
+  header {
+    text-align: center;
+    margin-bottom: 56px;
+    animation: fadeUp 0.7s ease both;
+  }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(99,120,255,0.12);
+    border: 1px solid var(--border2);
+    border-radius: 999px;
+    padding: 6px 16px;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent2);
+    margin-bottom: 20px;
+  }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent2); animation: pulse 2s infinite; }
+  h1 {
+    font-size: clamp(28px, 5vw, 48px);
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    background: linear-gradient(135deg, #e8eaf6 0%, #a78bfa 50%, #6378ff 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 12px;
+  }
+  .subtitle {
+    font-size: 15px;
+    color: var(--text-secondary);
+    font-weight: 400;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
+  /* Layer sections */
+  .layer {
+    margin-bottom: 16px;
+    border-radius: 16px;
+    border: 1px solid var(--border);
+    overflow: visible;
+    animation: fadeUp 0.6s ease both;
+    position: relative;
+    background: rgba(13, 18, 48, 0.6);
+    backdrop-filter: blur(8px);
+  }
+  .layer:nth-child(1) { animation-delay: 0.1s; }
+  .layer:nth-child(2) { animation-delay: 0.2s; }
+  .layer:nth-child(3) { animation-delay: 0.3s; }
+  .layer:nth-child(4) { animation-delay: 0.4s; }
+
+  .layer-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(99,120,255,0.05);
+  }
+  .layer-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .layer-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .layer-body {
+    padding: 20px;
+    display: flex;
+    gap: 14px;
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  /* Cards */
+  .card {
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    padding: 18px;
+    flex: 1;
+    min-width: 180px;
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+  }
+  .card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    transition: opacity 0.2s;
+    border-radius: 12px;
+  }
+  .card:hover { transform: translateY(-3px); }
+  .card:hover::before { opacity: 1; }
+
+  /* Card color themes */
+  .card-blue   { background: rgba(24,95,165,0.12); border-color: rgba(55,138,221,0.25); }
+  .card-blue:hover   { border-color: rgba(55,138,221,0.6); box-shadow: 0 8px 32px rgba(55,138,221,0.2); }
+  .card-blue::before { background: linear-gradient(135deg, rgba(55,138,221,0.06), transparent); }
+
+  .card-teal   { background: rgba(15,110,86,0.14); border-color: rgba(29,158,117,0.25); }
+  .card-teal:hover   { border-color: rgba(29,158,117,0.6); box-shadow: 0 8px 32px rgba(29,158,117,0.2); }
+  .card-teal::before { background: linear-gradient(135deg, rgba(29,158,117,0.06), transparent); }
+
+  .card-coral  { background: rgba(153,60,29,0.14); border-color: rgba(216,90,48,0.25); }
+  .card-coral:hover  { border-color: rgba(216,90,48,0.6); box-shadow: 0 8px 32px rgba(216,90,48,0.2); }
+  .card-coral::before { background: linear-gradient(135deg, rgba(216,90,48,0.06), transparent); }
+
+  .card-amber  { background: rgba(133,79,11,0.16); border-color: rgba(186,117,23,0.25); }
+  .card-amber:hover  { border-color: rgba(186,117,23,0.6); box-shadow: 0 8px 32px rgba(186,117,23,0.2); }
+  .card-amber::before { background: linear-gradient(135deg, rgba(186,117,23,0.06), transparent); }
+
+  .card-purple { background: rgba(83,74,183,0.14); border-color: rgba(127,119,221,0.25); }
+  .card-purple:hover { border-color: rgba(127,119,221,0.6); box-shadow: 0 8px 32px rgba(127,119,221,0.2); }
+  .card-purple::before { background: linear-gradient(135deg, rgba(127,119,221,0.06), transparent); }
+
+  .card-green  { background: rgba(59,109,17,0.14); border-color: rgba(99,153,34,0.25); }
+  .card-green:hover  { border-color: rgba(99,153,34,0.6); box-shadow: 0 8px 32px rgba(99,153,34,0.2); }
+  .card-green::before { background: linear-gradient(135deg, rgba(99,153,34,0.06), transparent); }
+
+  .card-pink   { background: rgba(153,53,86,0.14); border-color: rgba(212,83,126,0.25); }
+  .card-pink:hover   { border-color: rgba(212,83,126,0.6); box-shadow: 0 8px 32px rgba(212,83,126,0.2); }
+  .card-pink::before { background: linear-gradient(135deg, rgba(212,83,126,0.06), transparent); }
+
+  .card-gray   { background: rgba(68,68,65,0.18); border-color: rgba(136,135,128,0.25); }
+  .card-gray:hover   { border-color: rgba(136,135,128,0.6); box-shadow: 0 8px 32px rgba(136,135,128,0.2); }
+  .card-gray::before { background: linear-gradient(135deg, rgba(136,135,128,0.06), transparent); }
+
+  .card-icon { font-size: 22px; margin-bottom: 10px; display: block; }
+  .card-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  .card-sub {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+    letter-spacing: 0.02em;
+  }
+
+  /* Sub-chips inside cards */
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .chip {
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+    color: var(--text-secondary);
+    background: rgba(255,255,255,0.04);
+    white-space: nowrap;
+  }
+
+  /* Sub-tag on card top-right */
+  .layer-tag {
+    position: absolute;
+    top: 10px; right: 12px;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    opacity: 0.7;
+  }
+
+  /* User node — special */
+  .user-node {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 90px;
+    max-width: 110px;
+    gap: 6px;
+    padding: 20px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(127,119,221,0.3);
+    background: rgba(83,74,183,0.12);
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .user-node:hover { transform: translateY(-3px); box-shadow: 0 8px 24px rgba(127,119,221,0.2); }
+  .user-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: linear-gradient(135deg, var(--purple-600), var(--blue-600));
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+  }
+  .user-label { font-size: 12px; font-weight: 600; color: var(--text-primary); }
+  .user-sub { font-size: 10px; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; }
+
+  /* Flow arrows */
+  .flow-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    font-size: 18px;
+    flex-shrink: 0;
+    padding: 4px 0;
+    align-self: center;
+  }
+  .flow-arrow-vertical {
+    display: flex;
+    justify-content: center;
+    padding: 2px 0 6px;
+    color: var(--text-muted);
+    font-size: 16px;
+    position: relative;
+  }
+  .flow-arrow-vertical::before {
+    content: '';
+    position: absolute;
+    left: 50%; top: 0; bottom: 16px;
+    width: 1px;
+    background: linear-gradient(to bottom, var(--border2), transparent);
+    transform: translateX(-50%);
+  }
+
+  /* Flow connector between layers */
+  .connector {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 24px;
+    margin: -4px 0;
+    position: relative;
+    z-index: 2;
+  }
+  .connector-line {
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--border2), transparent);
+  }
+  .connector-label {
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .connector-arrow {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .conn-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--border2);
+  }
+  .conn-line {
+    width: 1px; height: 20px;
+    background: linear-gradient(to bottom, var(--border2), transparent);
+    margin: 0 auto;
+  }
+
+  /* Special: AI trigger badge */
+  .trigger-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px dashed rgba(127,119,221,0.5);
+    color: var(--accent2);
+    background: rgba(127,119,221,0.08);
+    margin-top: 8px;
+    width: fit-content;
+  }
+
+  /* Webhook badge */
+  .webhook-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    border-radius: 4px;
+    border: 1px dashed rgba(136,135,128,0.5);
+    color: var(--text-secondary);
+    background: rgba(136,135,128,0.08);
+    margin-top: 8px;
+    width: fit-content;
+  }
+
+  /* Legend */
+  .legend {
+    margin-top: 40px;
+    padding: 20px 24px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: rgba(13,18,48,0.5);
+    animation: fadeUp 0.6s ease 0.5s both;
+  }
+  .legend-title {
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 14px;
+  }
+  .legend-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .legend-arrow {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+  }
+  .arrow-solid { width: 28px; height: 1.5px; background: var(--text-secondary); position: relative; }
+  .arrow-solid::after { content: '▶'; position: absolute; right: -6px; top: -5px; font-size: 8px; color: var(--text-secondary); }
+  .arrow-dashed { width: 28px; height: 1.5px; background: repeating-linear-gradient(90deg, var(--accent2) 0, var(--accent2) 4px, transparent 4px, transparent 8px); position: relative; }
+  .arrow-dashed::after { content: '▶'; position: absolute; right: -6px; top: -5px; font-size: 8px; color: var(--accent2); }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    margin-top: 48px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    animation: fadeUp 0.6s ease 0.6s both;
+  }
+
+  /* Animations */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  /* Responsive */
+  @media (max-width: 700px) {
+    .layer-body { flex-direction: column; }
+    .card { min-width: unset; }
+    .flow-arrow { display: none; }
+    h1 { font-size: 26px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="blob blob-1"></div>
+<div class="blob blob-2"></div>
+<div class="blob blob-3"></div>
+
+<div class="wrapper">
+
+  <!-- Header -->
+  <header>
+    <div class="badge"><span class="badge-dot"></span> System Architecture v1.0</div>
+    <h1>AI-Powered Website<br>Testing Platform</h1>
+    <p class="subtitle">End-to-end automated testing pipeline with intelligent failure analysis, BFS crawling, and real-time reporting.</p>
+  </header>
+
+  <!-- ── LAYER 1: Presentation ── -->
+  <div class="layer">
+    <div class="layer-header">
+      <div class="layer-dot" style="background:#378add"></div>
+      <span class="layer-label">Presentation Layer</span>
+    </div>
+    <div class="layer-body" style="align-items:center">
+
+      <!-- User -->
+      <div class="user-node" title="End user of the platform">
+        <div class="user-avatar">👤</div>
+        <div class="user-label">User</div>
+        <div class="user-sub">initiates tests</div>
+      </div>
+
+      <div class="flow-arrow">→</div>
+
+      <!-- Frontend -->
+      <div class="card card-blue" style="flex:3; min-width:320px" title="React/Web Frontend">
+        <span class="layer-tag" style="color:#378add; background:rgba(55,138,221,0.1)">Frontend</span>
+        <span class="card-icon">🖥️</span>
+        <div class="card-title">Frontend Interface</div>
+        <div class="card-sub">React / Web Application</div>
+        <div class="chips">
+          <span class="chip">📊 Dashboard</span>
+          <span class="chip">🧪 Test Case Viewer</span>
+          <span class="chip">📋 Reports UI</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connector -->
+  <div class="connector">
+    <div class="connector-line"></div>
+    <div class="connector-label">HTTP / REST API</div>
+    <div class="connector-line"></div>
+  </div>
+
+  <!-- ── LAYER 2: Application ── -->
+  <div class="layer">
+    <div class="layer-header">
+      <div class="layer-dot" style="background:#1d9e75"></div>
+      <span class="layer-label">Application Layer</span>
+    </div>
+    <div class="layer-body">
+
+      <!-- Backend -->
+      <div class="card card-teal" style="flex:2" title="Node.js Backend Server">
+        <span class="layer-tag" style="color:#1d9e75; background:rgba(29,158,117,0.1)">Node.js</span>
+        <span class="card-icon">⚙️</span>
+        <div class="card-title">Backend Server</div>
+        <div class="card-sub">Express / Node.js</div>
+        <div class="chips">
+          <span class="chip">🔌 API Layer</span>
+          <span class="chip">🎛️ Test Controller</span>
+          <span class="chip">🪝 Webhook Handler</span>
+        </div>
+        <div style="margin-top:12px; padding:10px; border-radius:7px; border:1px solid rgba(29,158,117,0.2); background:rgba(29,158,117,0.06)">
+          <div style="font-size:9px; font-family:'JetBrains Mono',monospace; color:#1d9e75; letter-spacing:0.08em; text-transform:uppercase; margin-bottom:6px">Optimization Layer</div>
+          <div class="chips">
+            <span class="chip">🗃️ Cache (visited)</span>
+            <span class="chip">⏭️ Skip logic</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Testing Engine -->
+      <div class="card card-coral" style="flex:1.5" title="Playwright Testing Engine">
+        <span class="layer-tag" style="color:#d85a30; background:rgba(216,90,48,0.1)">Execution</span>
+        <span class="card-icon">🎭</span>
+        <div class="card-title">Testing Engine</div>
+        <div class="card-sub">Playwright</div>
+        <div class="chips">
+          <span class="chip">🤖 Browser automation</span>
+          <span class="chip">🌐 Chrome</span>
+          <span class="chip">🦊 Firefox</span>
+          <span class="chip">🍎 WebKit</span>
+        </div>
+        <div class="trigger-badge">⚡ triggers AI on failure</div>
+      </div>
+
+      <!-- Crawler -->
+      <div class="card card-amber" style="flex:1.5" title="BFS Web Crawler">
+        <span class="layer-tag" style="color:#ba7517; background:rgba(186,117,23,0.1)">Crawler</span>
+        <span class="card-icon">🕷️</span>
+        <div class="card-title">Crawling System</div>
+        <div class="card-sub">BFS-based crawler</div>
+        <div class="chips">
+          <span class="chip">📋 URL Queue</span>
+          <span class="chip">✅ Visited set</span>
+          <span class="chip">⏳ Pending set</span>
+          <span class="chip">🗺️ Site map</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connector -->
+  <div class="connector">
+    <div class="connector-line"></div>
+    <div class="connector-label">Results + Failures</div>
+    <div class="connector-line"></div>
+  </div>
+
+  <!-- ── LAYER 3: Intelligence ── -->
+  <div class="layer">
+    <div class="layer-header">
+      <div class="layer-dot" style="background:#7f77dd"></div>
+      <span class="layer-label">Intelligence Layer — triggered on failures only</span>
+    </div>
+    <div class="layer-body">
+
+      <!-- AI Engine -->
+      <div class="card card-purple" style="flex:2.5" title="AI / LLM Analysis Engine">
+        <span class="layer-tag" style="color:#7f77dd; background:rgba(127,119,221,0.1)">Intelligence</span>
+        <span class="card-icon">🧠</span>
+        <div class="card-title">AI Analysis Engine</div>
+        <div class="card-sub">LLM-powered reasoning</div>
+        <div class="chips">
+          <span class="chip">🔍 Failure analysis</span>
+          <span class="chip">🔧 Fix suggestions</span>
+          <span class="chip">📝 Report summary</span>
+          <span class="chip">🎯 Root cause</span>
+        </div>
+        <div class="trigger-badge">🔀 only on test failure</div>
+      </div>
+
+      <!-- LLM API -->
+      <div class="card card-pink" style="flex:1.5" title="External LLM API">
+        <span class="layer-tag" style="color:#d4537e; background:rgba(212,83,126,0.1)">External API</span>
+        <span class="card-icon">🤖</span>
+        <div class="card-title">LLM API</div>
+        <div class="card-sub">External AI provider</div>
+        <div class="chips">
+          <span class="chip">⚡ Groq API</span>
+          <span class="chip">🌀 OpenAI API</span>
+          <span class="chip">🔑 API Key auth</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Connector -->
+  <div class="connector">
+    <div class="connector-line"></div>
+    <div class="connector-label">Persist + Notify</div>
+    <div class="connector-line"></div>
+  </div>
+
+  <!-- ── LAYER 4: Data ── -->
+  <div class="layer">
+    <div class="layer-header">
+      <div class="layer-dot" style="background:#639922"></div>
+      <span class="layer-label">Data Layer</span>
+    </div>
+    <div class="layer-body">
+
+      <!-- Database -->
+      <div class="card card-green" style="flex:2" title="SQLite Database">
+        <span class="layer-tag" style="color:#639922; background:rgba(99,153,34,0.1)">Data</span>
+        <span class="card-icon">🗄️</span>
+        <div class="card-title">Database</div>
+        <div class="card-sub">SQLite</div>
+        <div class="chips">
+          <span class="chip">🏃 Test runs</span>
+          <span class="chip">📊 Results</span>
+          <span class="chip">🐛 Issues / bugs</span>
+          <span class="chip">📈 History</span>
+        </div>
+      </div>
+
+      <!-- Webhooks -->
+      <div class="card card-gray" style="flex:2" title="Webhook endpoints triggered after test completion">
+        <span class="layer-tag" style="color:#888780; background:rgba(136,135,128,0.1)">Webhooks</span>
+        <span class="card-icon">🔔</span>
+        <div class="card-title">External Webhooks</div>
+        <div class="card-sub">Post-completion triggers</div>
+        <div class="chips">
+          <span class="chip">💬 Slack</span>
+          <span class="chip">🔷 Teams</span>
+          <span class="chip">🔁 CI/CD pipeline</span>
+          <span class="chip">📮 Custom endpoints</span>
+        </div>
+        <div class="webhook-badge">🔀 after test completion</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── LEGEND ── -->
+  <div class="legend">
+    <div class="legend-title">Legend</div>
+    <div class="legend-items">
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(55,138,221,0.5); border:1px solid #378add"></div> Frontend</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(29,158,117,0.5); border:1px solid #1d9e75"></div> Backend</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(216,90,48,0.5); border:1px solid #d85a30"></div> Testing engine</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(186,117,23,0.5); border:1px solid #ba7517"></div> Crawler</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(127,119,221,0.5); border:1px solid #7f77dd"></div> AI / Intelligence</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(99,153,34,0.5); border:1px solid #639922"></div> Database</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(212,83,126,0.5); border:1px solid #d4537e"></div> LLM API</div>
+      <div class="legend-item"><div class="legend-dot" style="background:rgba(136,135,128,0.5); border:1px solid #888780"></div> Webhooks</div>
+      <div class="legend-arrow"><div class="arrow-solid"></div> Primary flow</div>
+      <div class="legend-arrow"><div class="arrow-dashed"></div> Conditional trigger</div>
+    </div>
+  </div>
+
+  <footer>
+    AI Website Testing Platform · System Architecture · Built for Hackathon 2025
+  </footer>
+
+</div>
+</body>
+</html>
